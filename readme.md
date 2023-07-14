@@ -224,3 +224,236 @@ Using the `upload_to_db` method in the `DatabaseConnector` class, upload the cle
 
 By completing these steps, you will be able to extract the date-time data from the JSON file, clean the extracted data using the `DataCleaning` class, and upload the cleaned data to the "dim_date_times" table in the database.
 
+
+## Updating Data Types in "orders_table"
+
+To update the data types in the "orders_table" to match the required data types mentioned, follow these steps:
+
+1. Retrieve the current schema and data types of the "orders_table" from the database.
+
+2. Update the data types of the following columns:
+   - `date_uuid` to `UUID`
+   - `user_uuid` to `UUID`
+   - `card_number` to `VARCHAR(?1)` (Replace ?1 with the maximum length of the values in the `card_number` column)
+   - `store_code` to `VARCHAR(?2)` (Replace ?2 with the maximum length of the values in the `store_code` column)
+   - `product_code` to `VARCHAR(?3)` (Replace ?3 with the maximum length of the values in the `product_code` column)
+   - `product_quantity` to `SMALLINT`
+
+3. Alter the table in the database to update the data types of the respective columns.
+
+Please note that the specific syntax for altering the table and updating data types may vary depending on the database management system you are using. Use the appropriate SQL syntax supported by your database to execute the required alterations.
+
+By following these steps, you will update the data types in the "orders_table" to match the required data types specified in the table.
+
+``` SQL
+ALTER TABLE orders_table
+ALTER COLUMN date_uuid TYPE UUID USING date_uuid::uuid,
+ALTER COLUMN user_uuid TYPE UUID USING user_uuid::uuid,
+ALTER COLUMN card_number TYPE TEXT USING card_number::VARCHAR(32),
+ALTER COLUMN store_code TYPE TEXT USING store_code::VARCHAR(32),
+ALTER COLUMN product_code TYPE TEXT USING product_code::VARCHAR(32),
+ALTER COLUMN product_quantity TYPE BIGINT USING product_quantity::SMALLINT
+```
+
+# Updating Data Types in "dim_user_table"
+
+To update the data types in the "dim_user_table" to match the required data types mentioned, follow these steps:
+
+1. Retrieve the current schema and data types of the "dim_user_table" from the database.
+
+2. Update the data types of the following columns:
+   - `first_name` to `VARCHAR(255)`
+   - `last_name` to `VARCHAR(255)`
+   - `date_of_birth` to `DATE`
+   - `country_code` to `VARCHAR(?1)` (Replace ?1 with the maximum length of the values in the `country_code` column)
+   - `user_uuid` to `UUID`
+   - `join_date` to `DATE`
+
+3. Alter the table in the database to update the data types of the respective columns.
+
+Please note that the specific syntax for altering the table and updating data types may vary depending on the database management system you are using. Use the appropriate SQL syntax supported by your database to execute the required alterations.
+
+By following these steps, you will update the data types in the "dim_user_table" to match the required data types specified in the table. The estimated time for this task is approximately 2 hours, but it may vary depending on the complexity of your database structure and the database management system you are using.
+``` SQL
+ALTER TABLE dim_user_table
+ALTER COLUMN first_name TYPE VARCHAR(255) USING first_name::VARCHAR(255),
+ALTER COLUMN last_name TYPE VARCHAR(255) USING last_name::VARCHAR(255),
+ALTER COLUMN date_of_birth TYPE DATE USING date_of_birth::DATE,
+ALTER COLUMN country_code TYPE VARCHAR(4) USING country_code::VARCHAR(4),
+ALTER COLUMN user_uuid TYPE UUID USING user_uuid::UUID,
+ALTER COLUMN join_date TYPE DATE USING join_date::DATE
+
+```
+## Update dim_store_details
+To address the data type modifications and update the location column in the store details table, you can perform the following steps:
+
+1. Use SQL to merge one of the latitude columns into the other latitude column, resulting in a single latitude column.
+
+2. Execute SQL statements to set the required data types for each column as specified in the table.
+
+Here's an example of how the SQL statements would look:
+
+```sql
+--step 1
+update dim_store_details
+Set longitude = COALESCE(longitude,lat);
+
+-- step 2 
+delete from dim_store_details
+where latitude is null;
+
+-- step 2
+ALTER TABLE dim_store_details 
+DROP IF EXISTS lat,
+ALTER COLUMN longitude TYPE FLOAT USING longitude::float,
+ALTER COLUMN latitude TYPE FLOAT USING latitude::FLOAT,
+ALTER COLUMN locality TYPE VARCHAR(255) USING locality::VARCHAR(255),
+ALTER COLUMN store_code TYPE VARCHAR(20) USING store_code::VARCHAR(20),
+ALTER COLUMN staff_numbers TYPE SMALLINT USING staff_numbers::SMALLINT,
+ALTER COLUMN opening_date TYPE  DATE USING opening_date:: DATE,
+ALTER COLUMN store_type TYPE VARCHAR(255) USING store_type::VARCHAR(255),
+ALTER COLUMN country_code TYPE VARCHAR(4) USING country_code::VARCHAR(4),
+ALTER COLUMN continent TYPE VARCHAR(255) USING continent::VARCHAR(255);
+```
+
+
+
+## Data Cleaning and Database Storage for dim_products
+
+#### Step 1: Remove Currency Symbol from Product Price
+
+To ensure consistency and compatibility, the currency symbol (£) needs to be removed from the product_price column in the dim_products table. This step ensures that the product prices are in a standardized format for further analysis.
+
+To remove the currency symbol, execute the following SQL statement:
+
+```sql
+UPDATE dim_products
+SET product_price = REPLACE(product_price, '£', '');
+```
+
+#### Step 2: Add Weight Class Column in dim_products
+
+A new column named weight_class will be added to the dim_products table to provide a human-readable classification based on the weight range of each product. This classification will help the delivery team quickly make decisions based on the weight of the products.
+
+The weight range and corresponding weight class values are as follows:
+
+| weight_class | weight range (kg) |
+|--------------|-------------------|
+| Light        | < 2               |
+| Mid_Sized    | >= 2 - < 40       |
+| Heavy        | >= 40 - < 140     |
+| Truck_Required | >= 140           |
+
+To add the weight_class column and populate it with the appropriate values, the following SQL statement can be used:
+
+```sql
+ALTER TABLE dim_products
+ADD COLUMN weight_class VARCHAR(64);  
+update dim_products 
+set weight_class =
+CASE
+    WHEN weight < 2 THEN 'Light'
+    WHEN weight >= 2 AND weight < 40 THEN 'Mid_Sized'
+    WHEN weight >= 40 AND weight < 140 THEN 'Heavy'
+    WHEN weight >= 140 THEN 'Truck_Required'
+    END ;
+   
+ALTER TABLE dim_products
+RENAME COLUMN removed TO still_available;
+update dim_products
+set still_available =
+CASE
+    WHEN still_available = 'still_available' THEN 'TRUE' else 'FALSE'
+    END ;
+
+ALTER TABLE dim_products
+ALTER COLUMN product_price TYPE FLOAT USING product_price::FLOAT,
+ALTER COLUMN weight TYPE FLOAT USING weight:: FLOAT,
+ALTER COLUMN EAN TYPE VARCHAR(64) USING EAN::VARCHAR(64),
+ALTER COLUMN product_code TYPE VARCHAR(32) USING product_code::VARCHAR(32),
+ALTER COLUMN date_added TYPE DATE USING date_added::DATE,
+ALTER COLUMN uuid TYPE UUID USING uuid::UUID,
+ALTER COLUMN still_available TYPE boolean USING still_available::boolean,
+ALTER COLUMN weight_class TYPE VARCHAR(32) USING weight_class::VARCHAR(32);
+```
+
+After performing these additional steps, the cleaned and enriched data can be stored in the database, ready for further analysis and reporting.
+ 
+ ## update date_time table
+ To change the data types of columns in the `dim_date_times` table, follow these steps:
+
+Step 1:
+Open your preferred SQL client and connect to the database where the `dim_date_times` table is located.
+
+Step 2:
+Execute the following SQL statements to alter the data types of the columns:
+
+```sql
+ALTER TABLE dim_date_times
+ALTER COLUMN month TYPE varchar(8) USING month::varchar(8),
+ALTER COLUMN year TYPE varchar(8) USING year::varchar(8),
+ALTER COLUMN day TYPE varchar(8) USING day::varchar(8),
+ALTER COLUMN time_period TYPE varchar(8) USING time_period::varchar(8),
+ALTER COLUMN date_uuid TYPE UUID USING date_uuid::UUID;
+```
+
+Step 3:
+Save the changes to the SQL script and execute it against the database.
+
+Step 4:
+After executing the above SQL statements, the data types of the `month`, `year`, `day`, `time_period`, and `date_uuid` columns in the `dim_date_times` table will be updated according to the specified data types.
+
+Note: Please ensure that you have the necessary permissions to modify the table structure in the database.
+
+## update card_details_table
+To change the data types of columns in the `dim_card_details` table, follow these steps:
+
+Step 1:
+Open your preferred SQL client and connect to the database where the `dim_card_details` table is located.
+
+Step 2:
+Execute the following SQL statements to alter the data types of the columns:
+
+```sql
+ALTER TABLE dim_card_details
+ALTER COLUMN card_number TYPE varchar(64) USING card_number::varchar(64),
+ALTER COLUMN expiry_date TYPE varchar(8) USING expiry_date::varchar(8),
+ALTER COLUMN date_payment_confirmed TYPE date USING date_payment_confirmed::date;
+```
+
+Step 3:
+Save the changes to the SQL script and execute it against the database.
+
+Step 4:
+After executing the above SQL statements, the data types of the `card_number`, `expiry_date`, and `date_payment_confirmed` columns in the `dim_card_details` table will be updated according to the specified data types.
+
+##To add primary keys to the respective tables, execute the following SQL statements:
+
+For `dim_card_details` table:
+```sql
+ALTER TABLE dim_card_details ADD PRIMARY KEY (card_number);
+```
+
+For `dim_date_times` table:
+```sql
+ALTER TABLE dim_date_times ADD PRIMARY KEY (date_uuid);
+```
+
+For `dim_products` table:
+```sql
+ALTER TABLE dim_products ADD PRIMARY KEY (product_code);
+```
+
+For `dim_store_details` table:
+```sql
+ALTER TABLE dim_store_details ADD PRIMARY KEY (store_code);
+```
+
+For `dim_users` table:
+```sql
+ALTER TABLE dim_users ADD PRIMARY KEY (user_uuid);
+```
+
+These statements will add primary keys to the specified columns in their respective tables, ensuring uniqueness and improving data integrity. Save the changes to the SQL script and execute it against the database. Make sure you have the necessary permissions to modify the table structures.
+
+
