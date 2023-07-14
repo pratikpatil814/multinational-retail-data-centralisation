@@ -43,4 +43,10 @@ def upload_dim_date_times():
     df = data_ex().extract_from_s3_by_link()
     df = data_cc().clean_date_time(df)
     data_conn().upload_to_db("dim_date_times",df)
-
+if __name__ == '__main__':
+    upload_dim_date_times()
+    upload_dim_card_details()
+    upload_dim_store_details()
+    upload_dim_users()
+    upload_orders_table()
+    upload_product_weights()

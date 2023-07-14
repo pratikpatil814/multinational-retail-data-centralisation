@@ -89,15 +89,12 @@ class datacleaning():
         Returns:
             pd.DataFrame: The cleaned DataFrame.
         '''
-        df.drop(columns='lat',inplace=True)
         df = self.clean_error_with_dates(df,'opening_date') 
         df['staff_numbers'] =  pd.to_numeric( df['staff_numbers'].apply(self.remove_unwanted_char_from_string),errors='coerce', downcast="integer")
         df.dropna(subset = ['staff_numbers'],how='any',inplace= True)
-        df['country_code'] = df['country_code'].astype('category')
-        df['continent'] = df['continent'].astype('category')
-        df['store_type'] = df['store_type'].astype('category')
          
         return df
+    
     def remove_unwanted_char_from_string(self,value):
         '''
         Removes unwanted characters from a string.
@@ -121,6 +118,8 @@ class datacleaning():
             pd.DataFrame: The cleaned DataFrame.
         '''
         df[coloumn_name] = df[coloumn_name].apply(self.get_kg)
+        df = self.clean_products_data(df)
+
         return df
     def get_kg(self,value):
         '''
@@ -196,7 +195,7 @@ class datacleaning():
         Returns:
             pd.DataFrame: The cleaned DataFrame.
         '''
-        df =  self.clean_invalid_date(df,'date_added')
+        df =  self.clean_error_with_dates(df,'date_added')
         df.dropna(how='any',inplace= True)
         df.reset_index(inplace=True)       
         return df
